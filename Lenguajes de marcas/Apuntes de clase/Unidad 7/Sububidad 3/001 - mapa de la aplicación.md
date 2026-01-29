@@ -75,7 +75,7 @@ La app va de una biblioteca de videojuegos, tu tienes tus videojuegos fisicos, y
 
     transacciones.php: Registra las ventas para actualizar el "Precio de la última venta".
 
-📝 Resumen del Proyecto (La Carta a los Reyes Magos Completa)
+📝 Resumen del Proyecto
 
     "Nuestra plataforma es un ecosistema integral para coleccionistas de videojuegos físicos. Permitiremos el registro manual de colecciones, donde cada usuario podrá gestionar el estado de sus juegos (jugando, completado, pendiente), anotar sus préstamos a terceros y añadir valoraciones personales que alimentarán una nota media global.
 
