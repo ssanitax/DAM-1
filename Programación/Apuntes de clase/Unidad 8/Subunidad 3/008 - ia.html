@@ -1,0 +1,297 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Granja de Pollitos - Final Sin Transparencias</title>
+    <style>
+      html, body { margin:0; padding:0; background:#1a1a1a; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; }
+      canvas { background:#4a7c44; border:10px solid #3e2723; border-radius: 15px; box-shadow: 0 0 40px rgba(0,0,0,0.8); }
+      #info { position: absolute; top: 10px; color: white; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; pointer-events: none; }
+    </style>
+  </head>
+  <body>
+    <div id="info">Población: <span id="count">0</span> | Huevos: <span id="egg-count">0</span></div>
+    <canvas></canvas>
+
+    <script>
+      const lienzo = document.querySelector("canvas");
+      const ctx = lienzo.getContext("2d");
+      const contadorTxt = document.getElementById("count");
+      const contadorHuevosTxt = document.getElementById("egg-count");
+
+      const W = 800;
+      const H = 600;
+      lienzo.width = W;
+      lienzo.height = H;
+
+      const COLORES_POLLITOS = ["#FFEB3B", "#FFFFFF", "#795548", "#333333"];
+      let comida = [];
+      let npcs = [];
+      let huevos = [];
+      let lobo = null;
+
+      class Lobo {
+        constructor() {
+          this.x = -100;
+          this.y = Math.random() * H;
+          this.radio = 24;
+          this.velocidad = 2.4;
+          this.angulo = 0;
+          this.timerLobo = 0;
+          this.limiteTiempo = 600; // 10 segundos iniciales
+          this.pollosComidos = 0;
+          this.retirandose = false;
+        }
+
+        update() {
+          this.timerLobo++;
+          // Se retira si agota el tiempo (que baja por cada caza)
+          if (this.timerLobo > this.limiteTiempo) this.retirandose = true;
+
+          if (npcs.length > 0 && !this.retirandose) {
+            let cercano = null;
+            let minDist = Infinity;
+            npcs.forEach(n => {
+              if (n.moribundo) return;
+              let d = Math.hypot(this.x - n.x, this.y - n.y);
+              if (d < minDist) { minDist = d; cercano = n; }
+            });
+
+            if (cercano) {
+              this.angulo = Math.atan2(cercano.y - this.y, cercano.x - this.x);
+              if (minDist < this.radio + cercano.radio) {
+                npcs.splice(npcs.indexOf(cercano), 1);
+                this.pollosComidos++;
+                this.timerLobo = 0; // Reinicia reloj al cazar
+                
+                // Baja 1 seg cada 2 pollos comidos
+                let reduccion = Math.floor(this.pollosComidos / 2) * 60;
+                this.limiteTiempo = Math.max(60, 600 - reduccion);
+              }
+            }
+          } else {
+            this.angulo = 0; // Escapa recto
+          }
+
+          this.x += Math.cos(this.angulo) * this.velocidad;
+          this.y += Math.sin(this.angulo) * this.velocidad;
+          return (this.x > W + 150);
+        }
+
+        draw() {
+          ctx.save();
+          ctx.translate(this.x, this.y);
+          ctx.rotate(this.angulo);
+          ctx.fillStyle = "#37474F";
+          ctx.beginPath(); ctx.ellipse(0, 0, this.radio * 1.4, this.radio, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(this.radio * 0.8, 0, this.radio * 0.7, this.radio * 0.5, 0, 0, Math.PI * 2); ctx.fill();
+          for(let i of [-1, 1]) {
+            ctx.beginPath();
+            ctx.moveTo(this.radio * 0.2, i * this.radio * 0.8);
+            ctx.lineTo(this.radio * 0.5, i * this.radio * 1.4);
+            ctx.lineTo(this.radio * 0.8, i * this.radio * 0.5); ctx.fill();
+          }
+          ctx.fillStyle = "#FFD700";
+          ctx.beginPath(); ctx.arc(this.radio * 0.9, -6, 5, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(this.radio * 0.9, 6, 5, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = "red";
+          ctx.beginPath(); ctx.arc(this.radio * 1.0, -6, 2, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(this.radio * 1.0, 6, 2, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = "black";
+          ctx.beginPath(); ctx.arc(this.radio * 1.4, 0, 3, 0, Math.PI * 2); ctx.fill();
+          ctx.restore();
+        }
+      }
+
+      class Huevo {
+        constructor(x, y) {
+          this.x = x; this.y = y;
+          this.tiempoNacimiento = Date.now() + 10000;
+          this.radio = 8; this.shake = 0;
+        }
+        update() {
+          const tiempoRestante = this.tiempoNacimiento - Date.now();
+          if (tiempoRestante < 2000) this.shake = Math.sin(Date.now() * 0.05) * 2;
+          if (tiempoRestante <= 0) {
+            const colorAleatorio = COLORES_POLLITOS[Math.floor(Math.random() * COLORES_POLLITOS.length)];
+            npcs.push(new Pollito(this.x, this.y, colorAleatorio));
+            return true;
+          }
+          return false;
+        }
+        draw() {
+          ctx.save(); ctx.translate(this.x + this.shake, this.y);
+          ctx.fillStyle = "rgba(0,0,0,0.15)";
+          ctx.beginPath(); ctx.ellipse(0, 4, this.radio, this.radio * 0.4, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = "#F5F5F5";
+          ctx.beginPath(); ctx.ellipse(0, 0, this.radio * 0.8, this.radio, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = "#DDD"; ctx.lineWidth = 1; ctx.stroke();
+          ctx.restore();
+        }
+      }
+
+      class Pollito {
+        constructor(x, y, color) {
+          this.x = x; this.y = y;
+          this.radioInicial = 12;
+          this.radio = this.radioInicial;
+          this.puntosComida = 0; this.vx = 0; this.vy = 0;
+          this.angulo = Math.random() * Math.PI * 2;
+          this.colorBase = color;
+          this.alaWiggle = 0;
+          this.espera = 0;
+          this.huevosPuestos = 0;
+          this.moribundo = false;
+          this.timerMuerte = 600; 
+        }
+
+        comer() {
+          if (this.moribundo) return;
+          this.radio += 1.5;
+          this.puntosComida++;
+          if (this.puntosComida >= 20) {
+            this.huevosPuestos++;
+            huevos.push(new Huevo(this.x, this.y));
+            this.radio = this.radioInicial;
+            this.puntosComida = 0;
+            this.espera = 60;
+            if (this.huevosPuestos >= 3) this.moribundo = true;
+          }
+        }
+
+        update() {
+          if (this.moribundo) {
+            this.timerMuerte--;
+            this.angulo += 0.05;
+            this.x += Math.cos(this.angulo) * 0.5;
+            this.y += Math.sin(this.angulo) * 0.5;
+            return (this.timerMuerte <= 0);
+          }
+          if (this.espera > 0) { this.espera--; return false; }
+
+          if (lobo && !lobo.retirandose) {
+            let dLobo = Math.hypot(this.x - lobo.x, this.y - lobo.y);
+            if (dLobo < 160) {
+              this.angulo = Math.atan2(this.y - lobo.y, this.x - lobo.x);
+              this.vx += Math.cos(this.angulo) * 0.6;
+              this.vy += Math.sin(this.angulo) * 0.6;
+            }
+          }
+
+          npcs.forEach(otro => {
+            if (otro === this) return;
+            let dist = Math.hypot(this.x - otro.x, this.y - otro.y);
+            let minDist = this.radio + otro.radio + 12;
+            if (dist < minDist) {
+              this.vx += (this.x - otro.x) / dist * 0.06;
+              this.vy += (this.y - otro.y) / dist * 0.06;
+            }
+          });
+
+          if (comida.length > 0 && Math.random() > 0.2) {
+            let cercano = null, minDist = Infinity;
+            comida.forEach(p => {
+              let d = Math.hypot(this.x - p.x, this.y - p.y);
+              if (d < minDist) { minDist = d; cercano = p; }
+            });
+            let angleToFood = Math.atan2(cercano.y - this.y, cercano.x - this.x);
+            let diff = angleToFood - this.angulo;
+            this.angulo += Math.atan2(Math.sin(diff), Math.cos(diff)) * 0.12;
+          } else {
+            this.angulo += (Math.random() - 0.5) * 0.2;
+          }
+
+          this.vx += Math.cos(this.angulo) * 0.2;
+          this.vy += Math.sin(this.angulo) * 0.2;
+          this.vx *= 0.92; this.vy *= 0.92;
+          this.x += this.vx; this.y += this.vy;
+
+          if (this.x < this.radio || this.x > W - this.radio) this.vx *= -1;
+          if (this.y < this.radio || this.y > H - this.radio) this.vy *= -1;
+
+          this.alaWiggle = Math.sin(Date.now() * 0.01) * (this.radio * 0.3);
+
+          for (let i = comida.length - 1; i >= 0; i--) {
+            if (Math.hypot(this.x - comida[i].x, this.y - comida[i].y) < this.radio + 5) {
+              comida.splice(i, 1); this.comer(); this.espera = 25; break; 
+            }
+          }
+          return false;
+        }
+
+        draw() {
+          ctx.save(); ctx.translate(this.x, this.y);
+          ctx.rotate(Math.atan2(this.vy, this.vx));
+          
+          // Mantenemos color sólido (Sin transparencias como pediste)
+          ctx.fillStyle = "rgba(0,0,0,0.15)";
+          ctx.beginPath(); ctx.ellipse(0, 5, this.radio, this.radio * 0.5, 0, 0, Math.PI * 2); ctx.fill();
+          
+          ctx.strokeStyle = "#E65100"; ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(0, -this.radio * 0.5); ctx.lineTo(-this.radio * 0.5, -this.radio * 1);
+          ctx.moveTo(0, this.radio * 0.5); ctx.lineTo(-this.radio * 0.5, this.radio * 1);
+          ctx.stroke();
+
+          ctx.fillStyle = this.colorBase;
+          ctx.beginPath(); ctx.arc(0, 0, this.radio, 0, Math.PI * 2); ctx.fill();
+          
+          ctx.beginPath();
+          ctx.ellipse(-this.radio * 0.1, -this.radio * 0.8, this.radio * 0.5, this.radio * 0.2 + Math.abs(this.alaWiggle), 0, 0, Math.PI * 2);
+          ctx.ellipse(-this.radio * 0.1, this.radio * 0.8, this.radio * 0.5, this.radio * 0.2 + Math.abs(this.alaWiggle), 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = "#FF9800";
+          ctx.beginPath(); ctx.moveTo(this.radio * 0.8, -this.radio * 0.25); ctx.lineTo(this.radio * 1.4, 0); ctx.lineTo(this.radio * 0.8, this.radio * 0.25); ctx.fill();
+
+          const par = Math.sin(Date.now() * 0.005) > 0.98 ? 0.1 : 1;
+          ctx.fillStyle = "black";
+          ctx.beginPath(); ctx.ellipse(this.radio * 0.5, -this.radio * 0.4, 2, 2 * par, 0, 0, Math.PI * 2);
+          ctx.ellipse(this.radio * 0.5, this.radio * 0.4, 2, 2 * par, 0, 0, Math.PI * 2); ctx.fill();
+          
+          ctx.restore();
+        }
+      }
+
+      function init() {
+        for (let i = 0; i < 5; i++) npcs.push(new Pollito(Math.random()*W, Math.random()*H, COLORES_POLLITOS[i%4]));
+        setInterval(() => { if (comida.length < 50) comida.push({ x: 50 + Math.random() * (W - 100), y: 50 + Math.random() * (H - 100) }); }, 500);
+        
+        const spawnLobo = () => {
+          lobo = new Lobo();
+          const checkLobo = setInterval(() => {
+            if (lobo === null) {
+              clearInterval(checkLobo);
+              setTimeout(spawnLobo, 60000); // 1 minuto entre lobos
+            }
+          }, 100);
+        };
+        setTimeout(spawnLobo, 10000);
+      }
+
+      function dibujarSuelo() {
+        ctx.fillStyle = "#4a7c44"; ctx.fillRect(0, 0, W, H);
+        ctx.globalAlpha = 0.2; ctx.fillStyle = "#3d2b1f";
+        for(let i=0; i<40; i++) {
+           ctx.beginPath(); ctx.arc((i * 137) % W, (i * 251) % H, 20 + (i % 15), 0, Math.PI*2); ctx.fill();
+        }
+        ctx.globalAlpha = 1.0;
+      }
+
+      function loop() {
+        dibujarSuelo();
+        if (lobo) { if (lobo.update()) lobo = null; else lobo.draw(); }
+        for (let i = huevos.length - 1; i >= 0; i--) { huevos[i].draw(); if (huevos[i].update()) huevos.splice(i, 1); }
+        ctx.fillStyle = "#FFF9C4";
+        comida.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2); ctx.fill(); });
+        for (let i = npcs.length - 1; i >= 0; i--) { if (npcs[i].update()) npcs.splice(i, 1); else npcs[i].draw(); }
+        contadorTxt.innerText = npcs.length;
+        contadorHuevosTxt.innerText = huevos.length;
+        requestAnimationFrame(loop);
+      }
+
+      init();
+      loop();
+    </script>
+  </body>
+</html>
