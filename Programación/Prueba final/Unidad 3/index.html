@@ -109,9 +109,9 @@
             feedback.classList.add("winner");
             input.disabled = true;
         } else if (intento < numeroSecreto) {
-            feedback.textContent = "🔻 Demasiado bajo.";
+            feedback.textContent = "🔻 Más alto.";
         } else {
-            feedback.textContent = "🔺 Demasiado alto.";
+            feedback.textContent = "🔺 Más bajo.";
         }
 
         // Pista de paridad después del tercer intento
