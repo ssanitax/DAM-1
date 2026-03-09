@@ -1,0 +1,19 @@
+=====================================
+Archivo: /var/www/html/DAM-1/Bases de datos/Apuntes de clase/Unidad 2/Subunidad 5 - Restricciones de validación/011-actividad de clase.sql
+Resumen:
+Este archivo SQL crea una tabla llamada "Productos" y luego inserta varios registros en ella. La tabla tiene las siguientes columnas:
+
+- `id`: Identificador único para cada producto.
+- `nombre`: Nombre del producto (máximo 255 caracteres).
+- `descripcion`: Descripción del producto (texto largo).
+- `precio`: Precio del producto (decimal con dos decimales).
+- `stock`: Cantidad disponible en inventario (entero).
+
+La tabla también tiene varias restricciones de check para asegurar que los datos ingresados sean válidos:
+1. El stock no puede ser negativo.
+2. El precio debe estar entre 0 y 5000 unidades de moneda.
+3. El nombre del producto debe tener al menos 5 caracteres.
+
+Finalmente, el archivo inserta 24 registros en la tabla "Productos" con diferentes tipos de productos y sus respectivos detalles como nombre, descripción, precio y stock inicial.
+=====================================
+
